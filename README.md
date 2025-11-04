@@ -62,7 +62,7 @@ The library is organized as follows:
 ### Install from Source
 
 ```bash
-git clone https://github.com/Isaac-Matthews/tdx_pytools.git
+git clone https://github.com/TEE-Attestation/tdx_pytools.git
 cd tdx_pytools
 pip install .
 ```
@@ -189,6 +189,69 @@ The library implements a comprehensive 12-step verification process as documente
 12. **Terminal TCB Status Check**: Ensure platform is not in terminal state
 
 For detailed information about each step, see [VERIFICATION_PROCESS.md](VERIFICATION_PROCESS.md).
+
+### Policy Validation
+
+The toolkit supports validating attestation reports against security policies defined in JSON format. This allows you to enforce specific security requirements and check measurements are known good values.
+
+#### Policy File Format
+
+Policies are defined in JSON format with the following structure:
+
+```json
+{
+  "metadata": {
+    "name": "Intel TDX Security Policy",
+    "version": "1.0",
+    "description": "Example security policy for validating Intel TDX quotes"
+  },
+  "validation_rules": {
+    "tcb": {
+      "update": "standard",
+      "platform_tcb": "UpToDate",
+      "tdx_module_tcb": "UpToDate",
+      "qe_tcb": "UpToDate"
+    },
+    "body": {
+      "rtmr0": {
+        "exact_match": "abcd1234"
+      },
+      "rtmr1": {
+        "exact_match": "efab5678"
+      },
+      "rtmr2": {
+        "exact_match": "cdef9123"
+      },
+      "mr_td": {
+        "exact_match": "1234abcd"
+      }
+    },
+    "signature_data": {
+      "qe_cert_data": {
+        "qe_report": {
+          "cpu_svn": {
+            "exact_match": "1a2b3c4d1a2b3c4d0000000000000000"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+#### Policy Validation Rules
+
+##### TCB
+The `tcb` item within `validation_rules` is a special case. It is used to require specific TCB levels or better for various components, along with an `update` field to require a minimum TCB-R freshness. See the example policy or the excerpt above for an example.
+
+All other items within `validation_rules` are evaluated according to the specified rule type. The following validation rule types are supported:
+
+- **exact_match**: Field must exactly match the specified value
+- **min_value**: Field must be greater than or equal to the specified minimum
+- **max_value**: Field must be less than or equal to the specified maximum
+- **allow_list**: Field value must be in the list of allowed values
+- **deny_list**: Field value must not be in the list of denied values
+- **boolean**: Field must match the specified boolean value (true/false). This can be specified using the boolean value as the attribute value directly.
 
 ## Certificate Management
 

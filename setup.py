@@ -7,7 +7,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="tdx_pytools",
-    version="0.1.0",
+    version="0.1.1",
     packages=find_packages(),
     install_requires=[
         "requests>=2.25.0",
@@ -22,7 +22,7 @@ setup(
         ],
     },
     description="Python tools for Intel SGX/TDX attestation",
-    url="https://github.com/Isaac-Matthews/tdx_pytools",
+    url="https://github.com/TEE-Attestation/tdx_pytools",
     author="Isaac Matthews",
     author_email="isaac@hpe.com",
     license="MIT",

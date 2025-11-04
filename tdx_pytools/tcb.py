@@ -68,6 +68,35 @@ class TcbStatus(Enum):
             TcbStatus.OUT_OF_DATE_CONFIGURATION_NEEDED,
         )
 
+    def compare_status(self, other: "TcbStatus") -> bool:
+        """
+        Compare this TCB status with another TCB status.
+
+        Args:
+            other: Another TcbStatus to compare against
+
+        Returns:
+            bool: True if self is better than or equal to other, False otherwise
+        """
+        priority_order = [
+            TcbStatus.NOT_SUPPORTED,
+            TcbStatus.REVOKED,
+            TcbStatus.OUT_OF_DATE_CONFIGURATION_NEEDED,
+            TcbStatus.OUT_OF_DATE,
+            TcbStatus.CONFIGURATION_AND_SW_HARDENING_NEEDED,
+            TcbStatus.CONFIGURATION_NEEDED,
+            TcbStatus.SW_HARDENING_NEEDED,
+            TcbStatus.UP_TO_DATE,
+        ]
+
+        self_index = priority_order.index(self)
+        other_index = priority_order.index(other)
+
+        if self_index < other_index:
+            return False  # self is worse
+        else:
+            return True  # self is better or equal
+
 
 @dataclass
 class Tcb:

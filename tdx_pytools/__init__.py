@@ -87,7 +87,7 @@ from .verify import (
     verify_td_attributes,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __author__ = "Isaac Matthews"
 
 __all__ = [

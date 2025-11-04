@@ -33,6 +33,7 @@ from .fetch import (
     validate_fmspc,
     write_crl,
 )
+from .policy import AttestationPolicy, PolicyValidationError, validate_quote_with_policy
 from .quote import Quote
 from .tcb import Tcb, TcbStatus, combine_tcb_status, tcb_verify
 
@@ -572,6 +573,7 @@ def load_certificates_and_collateral(
             - 'tcb_info_certs': TCB Info signing certificates
             - 'sgx_extensions': Parsed SGX extensions from PCK certificate
             - 'fmspc': Validated FMSPC value
+            - 'update': Update policy used
 
     Raises:
         ValueError: For verification failures
@@ -701,6 +703,7 @@ def load_certificates_and_collateral(
         "tcb_info_certs": tcb_info_certs,
         "sgx_extensions": sgx_exts,
         "fmspc": fmspc,
+        "update": update,
     }
 
 
@@ -730,6 +733,7 @@ def perform_verification_checks(
         "tcb_info_raw",
         "tcb_info_certs",
         "sgx_extensions",
+        "update",
     ]
 
     missing_items = []
@@ -905,6 +909,7 @@ def perform_verification_checks(
         logger.error("Combined TCB status is terminal, attestation failed")
         raise ValueError(f"Combined TCB status is terminal: {combined_status.value}")
 
+    tcb_dict["update"] = collateral["update"]
     return quote.body.report_data.hex(), tcb_dict, combined_status
 
 
@@ -1058,6 +1063,12 @@ def main() -> None:
         help="Print report data at the end of successful verification",
     )
     parser.add_argument(
+        "-q",
+        "--policy",
+        default=None,
+        help="Path to the policy file (eg. example_policy.json). If not provided, no policy validation will be performed.",
+    )
+    parser.add_argument(
         "-e",
         "--early",
         action="store_true",
@@ -1079,13 +1090,16 @@ def main() -> None:
             quote_bytes = file.read()
 
         # Verify the quote
-        _, report_data, _, _, _ = verify_quote_bytes(
+        quote, report_data, _, tcb_dict, _ = verify_quote_bytes(
             quote_bytes=quote_bytes,
             certificates_path=args.certs,
             debug=args.debug,
             verbose=args.verbose,
             update="early" if args.early else "standard",
         )
+
+        if args.policy:
+            validate_quote_with_policy(quote, tcb_dict, args.policy)
 
         if args.reportdata:
             logger.info("\n\n")
