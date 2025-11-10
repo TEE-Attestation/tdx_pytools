@@ -49,6 +49,9 @@ from .fetch import (
     write_json_data,
 )
 
+# Policy validation
+from .policy import AttestationPolicy, PolicyValidationError, validate_quote_with_policy
+
 # QE Report structures
 from .qe_report import EnclaveReportBody, QeReportCertificationData
 
@@ -115,6 +118,10 @@ __all__ = [
     "validate_certificate_dates",
     "verify_certificate",
     "verify_crl",
+    # Policy validation
+    "AttestationPolicy",
+    "PolicyValidationError",
+    "validate_quote_with_policy",
     # Fetching and collateral
     "CertFormat",
     "fetch_crls",
