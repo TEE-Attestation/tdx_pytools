@@ -134,13 +134,17 @@ class AttestationPolicy:
                         error_msg = f"TCB update status validation failed: expected 'early', got '{tcb_dict.get('update')}'"
                         logger.error(error_msg)
                         raise PolicyValidationError(error_msg)
-                logger.info(f"TCB update status validation passed: required at least {expected_update}, got {tcb_dict.get('update')}")
+                logger.info(
+                    f"TCB update status validation passed: required at least {expected_update}, got {tcb_dict.get('update')}"
+                )
 
                 # Validate each TCB component
                 error_msgs = []
                 for tcb_name, expected_status_str in tcb_rules.items():
                     if tcb_name not in tcb_dict:
-                        error_msg = f"TCB component '{tcb_name}' not found in TCB dictionary"
+                        error_msg = (
+                            f"TCB component '{tcb_name}' not found in TCB dictionary"
+                        )
                         logger.error(error_msg)
                         raise PolicyValidationError(error_msg)
 
@@ -156,10 +160,14 @@ class AttestationPolicy:
                         error_msg = f"Invalid expected TCB status '{expected_status_str}' for component '{tcb_name}': {e}"
                         logger.error(error_msg)
                         raise PolicyValidationError(error_msg)
-                    
+
                     if not tcb.status.compare_status(expected_status):
-                        error_msgs.append(f"TCB component '{tcb_name}' validation failed: expected {expected_status.value}, got {tcb.status.value}")
-                    logger.info(f"TCB component '{tcb_name}' validation passed: {tcb.status.value}")
+                        error_msgs.append(
+                            f"TCB component '{tcb_name}' validation failed: expected {expected_status.value}, got {tcb.status.value}"
+                        )
+                    logger.info(
+                        f"TCB component '{tcb_name}' validation passed: {tcb.status.value}"
+                    )
                 if error_msgs:
                     for msg in error_msgs:
                         logger.error(msg)
@@ -177,9 +185,7 @@ class AttestationPolicy:
             try:
                 # Get the field value from the quote
                 if not hasattr(quote, field_name):
-                    logger.error(
-                        f"Field '{field_name}' not found in attestation quote"
-                    )
+                    logger.error(f"Field '{field_name}' not found in attestation quote")
                     validation_results.append((field_name, False))
                 else:
                     field_value = getattr(quote, field_name)

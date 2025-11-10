@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
@@ -185,6 +185,30 @@ class PCKCertChain:
             return True
         except Exception:
             return False
+
+    def get_sgx_extensions(self) -> Dict[str, bytes]:
+        """
+        Extract Intel SGX extensions from the PCK certificate.
+
+        Parses the SGX-specific extensions from the PCK certificate
+        and returns them as a dictionary, raising an error if required extensions are missing.
+
+        Returns:
+            dict: Dictionary of SGX extension values (keys are SgxOid enum names)
+        """
+        try:
+            sgx_extensions = parse_sgx_extensions(self.pck_cert)
+            # Check cert extensions include PPID, TCB, PCEID, FMSPC
+            required_oids = ["PPID", "TCB", "PCE_ID", "FMSPC"]
+            missing_oids = [oid for oid in required_oids if oid not in sgx_extensions]
+            if missing_oids:
+                raise ValueError(
+                    f"Missing required SGX extensions in PCK certificate: {', '.join(missing_oids)}"
+                )
+            return sgx_extensions
+        except Exception as e:
+            logger.error(f"Error extracting SGX extensions: {e}")
+            raise ValueError("Failed to extract SGX extensions from PCK certificate")
 
     def print_chain_details(self) -> None:
         """

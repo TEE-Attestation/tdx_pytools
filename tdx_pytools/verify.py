@@ -16,7 +16,6 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 from . import tdx_logging
 from .certs import (
     check_certificate_against_crl,
-    parse_sgx_extensions,
     validate_certificate_dates,
     verify_certificate,
     verify_crl,
@@ -660,19 +659,7 @@ def load_certificates_and_collateral(
 
     # Extract SGX extension values
     tdx_logging.log_section_header("SGX Certificate Extensions")
-    try:
-        pck_cert_chain = quote.signature_data.qe_cert_data.pck_cert_chain
-        sgx_exts = parse_sgx_extensions(pck_cert_chain.pck_cert)
-        # Check cert extensions include PPID, TCB, PCEID, FMSPC
-        required_oids = ["PPID", "TCB", "PCE_ID", "FMSPC"]
-        missing_oids = [oid for oid in required_oids if oid not in sgx_exts]
-        if missing_oids:
-            raise ValueError(
-                f"Missing required SGX extensions in PCK certificate: {', '.join(missing_oids)}"
-            )
-    except Exception as e:
-        logger.error(f"Error extracting SGX extensions: {e}")
-        raise ValueError("Failed to extract SGX extensions from PCK certificate")
+    sgx_exts = quote.signature_data.qe_cert_data.pck_cert_chain.get_sgx_extensions()
 
     # Convert FMSPC bytes to hex string for validation
     fmspc_hex = sgx_exts["FMSPC"].hex()
@@ -732,7 +719,6 @@ def perform_verification_checks(
         "qe_identity_certs",
         "tcb_info_raw",
         "tcb_info_certs",
-        "sgx_extensions",
         "update",
     ]
 
@@ -753,7 +739,10 @@ def perform_verification_checks(
     qe_identity_certs = collateral["qe_identity_certs"]
     tcb_info_raw = collateral["tcb_info_raw"]
     tcb_info_certs = collateral["tcb_info_certs"]
-    sgx_exts = collateral["sgx_extensions"]
+    try:
+        sgx_exts = collateral["sgx_extensions"]
+    except KeyError:
+        sgx_exts = quote.signature_data.qe_cert_data.pck_cert_chain.get_sgx_extensions()
 
     pck_cert_chain = quote.signature_data.qe_cert_data.pck_cert_chain
 
