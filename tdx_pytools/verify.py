@@ -879,7 +879,7 @@ def perform_verification_checks(
     verify_td_attributes(quote)
 
     # Log TCB statuses
-    logger.info("\n=== TCB Status Summary ===")
+    logger.info("=== TCB Status Summary ===")
     tcb_dict["qe_tcb"] = qe_tcb
     statuses = []
     for tcb_name, tcb in tcb_dict.items():
