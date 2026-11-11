@@ -246,12 +246,14 @@ The `tcb` item within `validation_rules` is a special case. It is used to requir
 
 All other items within `validation_rules` are evaluated according to the specified rule type. The following validation rule types are supported:
 
-- **exact_match**: Field must exactly match the specified value
+- **exact_match**: Field must exactly match the specified value. A non-boolean value given directly as the attribute value (e.g. `"version": 4`) is shorthand for this rule.
 - **min_value**: Field must be greater than or equal to the specified minimum
 - **max_value**: Field must be less than or equal to the specified maximum
 - **allow_list**: Field value must be in the list of allowed values
 - **deny_list**: Field value must not be in the list of denied values
 - **boolean**: Field must match the specified boolean value (true/false). This can be specified using the boolean value as the attribute value directly.
+
+Byte fields (`mr_td`, `rtmr0`–`rtmr3`, `mr_seam`, `report_data`, `cpu_svn`, …) are written as hex strings in the policy, for `exact_match`, `allow_list` and `deny_list` alike. Case is ignored and an optional `0x` prefix is accepted. A value that is not valid hex fails the rule.
 
 ## Certificate Management
 
