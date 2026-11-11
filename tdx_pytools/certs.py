@@ -69,6 +69,96 @@ class SgxOid(Enum):
         return self.value.dotted_string
 
 
+def _load_certificate_chain(cert_data: bytes) -> List[x509.Certificate]:
+    """
+    Parse a certificate chain that is either PEM or concatenated DER.
+
+    QE certification data of type 5 carries the PCK chain as "PEM or DER"
+    per the DCAP quote format; Intel's QGS emits PEM, while Intel's own QVL
+    sample quotes use back-to-back DER certificates. Try PEM first, then
+    walk the buffer as a sequence of DER SEQUENCE values.
+
+    Raises:
+        ValueError: If the data is neither valid PEM nor valid DER.
+    """
+    stripped = cert_data.rstrip(b"\x00")
+    if b"-----BEGIN CERTIFICATE-----" in stripped:
+        return x509.load_pem_x509_certificates(stripped)
+
+    certificates: List[x509.Certificate] = []
+    pos = 0
+    while pos < len(stripped):
+        if stripped[pos] != 0x30:
+            raise ValueError(
+                f"Certificate chain is neither PEM nor DER (unexpected byte "
+                f"0x{stripped[pos]:02x} at offset {pos})"
+            )
+        # Decode the DER SEQUENCE length to find this certificate's extent.
+        length_byte = stripped[pos + 1]
+        if length_byte & 0x80:
+            num_bytes = length_byte & 0x7F
+            length = int.from_bytes(stripped[pos + 2 : pos + 2 + num_bytes], "big")
+            header = 2 + num_bytes
+        else:
+            length = length_byte
+            header = 2
+        end = pos + header + length
+        if end > len(stripped):
+            raise ValueError("Truncated DER certificate in certification data")
+        certificates.append(x509.load_der_x509_certificate(stripped[pos:end]))
+        pos = end
+
+    logger.debug(f"Parsed {len(certificates)} DER certificate(s) from QE cert data")
+    return certificates
+
+
+def _order_chain_leaf_first(
+    certificates: List[x509.Certificate],
+) -> List[x509.Certificate]:
+    """
+    Return the chain ordered leaf -> intermediate(s) -> root.
+
+    The DCAP format describes the PCK chain as leaf-first, but Intel's QVL
+    sample quote embeds it root-first, so the order cannot be trusted. The
+    leaf is the certificate that no other certificate in the set names as its
+    issuer; from there the chain is followed by issuer -> subject links. If
+    the links do not form a single path the input order is returned as-is and
+    verify_chain() will report the problem.
+    """
+    if len(certificates) <= 1:
+        return certificates
+
+    issuers = {cert.issuer.public_bytes() for cert in certificates}
+    leaves = [c for c in certificates if c.subject.public_bytes() not in issuers]
+    if len(leaves) != 1:
+        logger.warning(
+            f"PCK certification data does not form a single chain "
+            f"({len(leaves)} leaf candidates); keeping embedded order"
+        )
+        return certificates
+
+    by_subject = {c.subject.public_bytes(): c for c in certificates}
+    ordered = [leaves[0]]
+    while True:
+        current = ordered[-1]
+        if current.issuer == current.subject:  # self-signed root
+            break
+        parent = by_subject.get(current.issuer.public_bytes())
+        if parent is None or parent in ordered:
+            break
+        ordered.append(parent)
+
+    if len(ordered) != len(certificates):
+        logger.warning(
+            "PCK certification data chain is not fully linked; keeping embedded order"
+        )
+        return certificates
+
+    if ordered != certificates:
+        logger.debug("Reordered PCK certificate chain to leaf-first")
+    return ordered
+
+
 @dataclass
 class PCKCertChain:
     """
@@ -78,20 +168,22 @@ class PCKCertChain:
     """
 
     pck_leaf_cert: x509.Certificate  # The PCK leaf certificate
-    pck_cert_chain: Optional[
-        List[x509.Certificate]
-    ] = None  # List of certificates in the chain (Intermediate and Root)
+    pck_cert_chain: Optional[List[x509.Certificate]] = (
+        None  # List of certificates in the chain (Intermediate and Root)
+    )
 
     @classmethod
     def from_certification_data(cls, cert_data: bytes) -> "PCKCertChain":
         """
         Create a PCKCertChain from QE certification data.
 
-        Parses PEM-encoded X.509 certificates from QE certification data
-        and organizes them into a certificate chain structure.
+        Parses the X.509 certificate chain carried in QE certification data
+        (type 5) and organizes it into a certificate chain structure. The
+        chain may be PEM (as emitted by Intel's QGS) or a concatenation of
+        DER-encoded certificates (as in Intel's DCAP QVL sample quotes).
 
         Args:
-            cert_data: Raw certification data from QE report (PEM format)
+            cert_data: Raw certification data from QE report (PEM or DER)
 
         Returns:
             PCKCertChain: Instance containing parsed certificates
@@ -99,7 +191,7 @@ class PCKCertChain:
         Raises:
             ValueError: If no valid certificates found in the provided data
         """
-        certificates = x509.load_pem_x509_certificates(cert_data)
+        certificates = _order_chain_leaf_first(_load_certificate_chain(cert_data))
         if len(certificates) > 1:
             return cls(pck_leaf_cert=certificates[0], pck_cert_chain=certificates[1:])
         elif len(certificates) == 1:
@@ -227,9 +319,7 @@ class PCKCertChain:
             cert_type = (
                 "PCK"
                 if i == 0
-                else "Root"
-                if i == len(self.certificates) - 1
-                else "Intermediate"
+                else "Root" if i == len(self.certificates) - 1 else "Intermediate"
             )
             print(f"\n--- Certificate {i + 1} ({cert_type}) ---")
             print_certificate_details(cert)

@@ -182,9 +182,9 @@ class QeReportCertificationData:
     qe_certification_data_type: int  # QE Certification Data Type (2 bytes)
     qe_certification_data_size: int  # QE Certification Data Size (4 bytes)
     qe_certification_data: bytes  # QE Certification Data (variable length)
-    pck_cert_chain: Optional[
-        "PCKCertChain"
-    ] = None  # Parsed certificate chain if available
+    pck_cert_chain: Optional["PCKCertChain"] = (
+        None  # Parsed certificate chain if available
+    )
 
     @classmethod
     def unpack(
@@ -287,9 +287,11 @@ class QeReportCertificationData:
                     cert_type = (
                         "PCK"
                         if i == 0
-                        else "Root"
-                        if i == len(pck_cert_chain.certificates) - 1
-                        else "Intermediate"
+                        else (
+                            "Root"
+                            if i == len(pck_cert_chain.certificates) - 1
+                            else "Intermediate"
+                        )
                     )
                     date_valid = validate_certificate_dates(cert)
                     print(
